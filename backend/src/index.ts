@@ -1,24 +1,31 @@
 // backend/src/index.ts
-import vcRoutes from './routes/vc'
 import express from 'express'
-import didRoutes from './routes/did'
-import { getAgent } from './agent'
-import vpRouter from './routes/vp'
+import cors from 'cors'
 
+import { getAgent } from './agent'
+import didRoutes from './routes/did'
+import vcRoutes from './routes/vc'
+import vpRouter from './routes/vp'
+import authRoutes from './routes/auth'
 
 async function main() {
-  // initialize agent first (ensures DB+migrations etc run)
+  // initialize agent first (ensures DB + migrations etc run)
   await getAgent()
 
   const app = express()
+
   app.use(express.json())
+  app.use(
+    cors({
+      origin: true,
+      credentials: true
+    })
+  )
 
   app.use('/did', didRoutes)
   app.use('/vc', vcRoutes)
   app.use('/vp', vpRouter)
-
-  
-
+  app.use('/auth', authRoutes)
 
   app.listen(3000, () => {
     console.log('Backend running on http://localhost:3000')
