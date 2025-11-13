@@ -1,24 +1,24 @@
 // backend/src/routes/did.ts
-import { Router, Request, Response } from 'express'
+import { Router } from 'express'
 import { getAgent } from '../agent'
 
 const router = Router()
 
-// Create an issuer DID (on Sepolia by default)
-router.post('/issuer', async (req: Request, res: Response) => {
+// Create Issuer DID (unchanged)
+router.post('/issuer', async (_req, res) => {
   try {
     const agent = await getAgent()
 
-    // create a new did:ethr:sepolia DID and return it
+    // create a new did:ethr:sepolia DID and return it (alias 'issuer')
     const created = await agent.didManagerCreate({
-      provider: 'did:ethr:sepolia'
+      provider: 'did:ethr:sepolia',
+      alias: 'issuer',
     })
 
-    // created will contain DID record + keys metadata
     return res.json({
       ok: true,
       message: 'Issuer DID created',
-      did: created
+      did: created,
     })
   } catch (err) {
     console.error('Error /did/issuer:', err)
@@ -26,8 +26,34 @@ router.post('/issuer', async (req: Request, res: Response) => {
   }
 })
 
-// Optional: list DIDs stored in the DB (useful for quick inspection)
-router.get('/list', async (_req: Request, res: Response) => {
+// -------------------------------
+// NEW: Create Citizen DID
+// -------------------------------
+// POST /did/citizen
+// Optionally accept { alias } in body to tag the DID (helpful for tests)
+router.post('/citizen', async (req, res) => {
+  try {
+    const { alias } = req.body || {}
+    const agent = await getAgent()
+
+    const created = await agent.didManagerCreate({
+      provider: 'did:ethr:sepolia',
+      alias: alias || undefined, // optional friendly label
+    })
+
+    return res.json({
+      ok: true,
+      message: 'Citizen DID created',
+      did: created,
+    })
+  } catch (err) {
+    console.error('Error /did/citizen:', err)
+    return res.status(500).json({ ok: false, error: (err as any).message || err })
+  }
+})
+
+// List stored DIDs (useful)
+router.get('/list', async (_req, res) => {
   try {
     const agent = await getAgent()
     const all = await agent.dataStoreORMGetIdentifiers()

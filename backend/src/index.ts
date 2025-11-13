@@ -3,6 +3,8 @@ import vcRoutes from './routes/vc'
 import express from 'express'
 import didRoutes from './routes/did'
 import { getAgent } from './agent'
+import vpRouter from './routes/vp'
+
 
 async function main() {
   // initialize agent first (ensures DB+migrations etc run)
@@ -13,6 +15,9 @@ async function main() {
 
   app.use('/did', didRoutes)
   app.use('/vc', vcRoutes)
+  app.use('/vp', vpRouter)
+
+  
 
 
   app.listen(3000, () => {
