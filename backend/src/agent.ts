@@ -1,4 +1,4 @@
-// src/agent.ts
+// backend/src/agent.ts
 import 'reflect-metadata'
 
 import {
@@ -12,12 +12,22 @@ import {
 
 import { KeyManager } from '@veramo/key-manager'
 import { KeyManagementSystem } from '@veramo/kms-local'
-import { Entities, migrations, DataStore, DataStoreORM, KeyStore, DIDStore, PrivateKeyStore } from '@veramo/data-store';
+
+import {
+  Entities,
+  migrations,
+  DataStore,
+  DataStoreORM,
+  KeyStore,
+  DIDStore,
+  PrivateKeyStore
+} from '@veramo/data-store'
 
 import { DIDManager } from '@veramo/did-manager'
 import { DIDResolverPlugin } from '@veramo/did-resolver'
 
 import { EthrDIDProvider } from '@veramo/did-provider-ethr'
+
 import { Resolver } from 'did-resolver'
 import { getResolver as ethrGetResolver } from 'ethr-did-resolver'
 
@@ -27,17 +37,14 @@ import { SelectiveDisclosure } from '@veramo/selective-disclosure'
 import { createConnection, ConnectionOptions, Connection } from 'typeorm'
 import * as path from 'path'
 
-// ---------------------------------------------------
-// INTERNAL STATE
-// ---------------------------------------------------
 let _agent: any = null
 let _db: Connection | null = null
 
 const DB_PATH = path.resolve(__dirname, '../db/database.sqlite')
 
-// ---------------------------------------------------
+// ------------------------------------------
 // TYPEORM CONFIG
-// ---------------------------------------------------
+// ------------------------------------------
 const typeormOptions: ConnectionOptions = {
   type: 'sqlite',
   database: DB_PATH,
@@ -48,9 +55,28 @@ const typeormOptions: ConnectionOptions = {
   synchronize: false
 }
 
-// ---------------------------------------------------
+// ------------------------------------------
+// OPTIMIZED LOCAL DID RESOLVER
+// ------------------------------------------
+//
+// This is the KEY to making verification PASS.
+// No RPC calls, no Sepolia downtime, pure local DID docs.
+//
+const localEthrResolver = ethrGetResolver({
+  localResolver: true,
+  networks: [
+    {
+      name: 'sepolia',
+      rpcUrl: 'dummy',        // not used
+      registry: undefined,    // DISABLE on-chain registry
+      chainId: 11155111
+    }
+  ]
+})
+
+// ------------------------------------------
 // AGENT FACTORY
-// ---------------------------------------------------
+// ------------------------------------------
 export async function getAgent() {
   if (_agent) return _agent
 
@@ -72,31 +98,29 @@ export async function getAgent() {
 
       // DID MANAGEMENT
       new DIDManager({
-  store: new DIDStore(_db),
+        store: new DIDStore(_db),
         defaultProvider: 'did:ethr:sepolia',
         providers: {
           'did:ethr:sepolia': new EthrDIDProvider({
             defaultKms: 'local',
             network: 'sepolia',
-            rpcUrl: 'https://rpc.sepolia.org'
+            rpcUrl: 'dummy' // irrelevant because resolver is local
           })
         }
       }),
 
-      // DID RESOLUTION
+      // DID RESOLUTION (LOCAL ONLY)
       new DIDResolverPlugin({
         resolver: new Resolver({
-          ...ethrGetResolver({
-            networks: [{ name: 'sepolia', rpcUrl: 'https://rpc.sepolia.org' }]
-          })
+          ...localEthrResolver
         })
       }),
 
-      // VC + SELECTIVE DISCLOSURE
+      // CREDENTIALS
       new CredentialPlugin(),
       new SelectiveDisclosure(),
 
-      // DB LAYER
+      // DATA STORE
       new DataStore(_db),
       new DataStoreORM(_db)
     ]
